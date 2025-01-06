@@ -1,0 +1,53 @@
+[
+    {
+        "label": "Toggle Item",
+        "type": "toggle",
+        "icon": "toggle_icon.png",
+        "thumbnail": "toggle_thumbnail.png",
+        "execute": "toggle_command",
+        "selected": "on"
+    },
+    {
+        "label": "Select Item",
+        "type": "select",
+        "icon": "select_icon.png",
+        "thumbnail": "select_thumbnail.png",
+        "execute": "select_command",
+        "items": [
+            "option1",
+            "option2",
+            "option3"
+        ],
+        "selected": "option2"
+    },
+    {
+        "label": "Folder Item",
+        "type": "menu",
+        "icon": "folder_icon.png",
+        "thumbnail": "folder_thumbnail.png",
+        "menu": [
+            {
+                "label": "Subitem 1",
+                "type": "cmd",
+                "icon": "subitem_icon1.png",
+                "thumbnail": "subitem_thumbnail1.png",
+                "execute": "subcommand1"
+            },
+            {
+                "label": "Subitem 2",
+                "type": "toggle",
+                "icon": "subitem_icon2.png",
+                "thumbnail": "subitem_thumbnail2.png",
+                "execute": "subtoggle_command",
+                "selected": "off"
+            }
+        ]
+    },
+    {
+        "label": "Command Item",
+        "type": "cmd",
+        "icon": "command_icon.png",
+        "thumbnail": "command_thumbnail.png",
+        "execute": "command_item"
+    }
+]
