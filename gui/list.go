@@ -1,4 +1,4 @@
-package components
+package gui
 
 import (
 	"github.com/veandco/go-sdl2/sdl"
@@ -70,7 +70,7 @@ func (l *List[T]) ScrollUp() {
 	}
 }
 
-func (l *List[T]) Draw(primaryColor sdl.Color, selectedColor sdl.Color) {
+func (l *List[T]) Draw() {
 	// Draw the items
 	startIndex := l.scrollOffset
 	endIndex := startIndex + l.maxVisibleItems
@@ -81,7 +81,7 @@ func (l *List[T]) Draw(primaryColor sdl.Color, selectedColor sdl.Color) {
 
 	for index, item := range visibleItems {
 		selected := index+startIndex == l.selectedIndex
-		l.renderItem(index+startIndex, item, selected)
+		l.renderItem(index, item, selected)
 	}
 }
 

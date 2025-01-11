@@ -9,7 +9,7 @@
                 "label": "List files",
                 "type": "cmd",
                 "icon": "subitem_icon1.png",
-                "execute": "ls -al ./theme/skin",
+                "execute": "ls -al  /",
                 "output": "full"
             },
             {
@@ -30,7 +30,7 @@
         ]
     },
     {
-        "label": "SubFolder 2",
+        "label": "Apps",
         "type": "menu",
         "icon": "folder_icon.png",
         "description":"This is another subfolder",

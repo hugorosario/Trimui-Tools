@@ -1,0 +1,503 @@
+package gui
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/hugorosario/trimuitools/shell"
+	"github.com/veandco/go-sdl2/sdl"
+)
+
+const (
+	itemHeight   = 120
+	itemSpacing  = 8
+	visibleItems = 5
+)
+
+type OptionsList struct {
+	Title string
+	List  *List[menuItem]
+}
+
+type MainScreen struct {
+	renderer      *sdl.Renderer
+	lists         []OptionsList
+	errorTextView *AlertView
+	lineView      *AlertView
+	initialized   bool
+	title         string
+	shellView     *ShellView
+	showShellView bool
+	shellRunnning bool
+	showLineView  bool
+	shellCancel   context.CancelFunc
+}
+
+type menuItem struct {
+	Label       string     `json:"label"`
+	Type        string     `json:"type"` // "toggle", "select", "menu", "cmd"
+	Icon        string     `json:"icon,omitempty"`
+	Description string     `json:"description,omitempty"`
+	Execute     string     `json:"execute,omitempty"`
+	Output      string     `json:"output,omitempty"`
+	SelectItems []string   `json:"items,omitempty"`
+	Selected    int        `json:"selected,omitempty"`
+	MenuItems   []menuItem `json:"menu,omitempty"`
+	IconTexture *sdl.Texture
+}
+
+func NewMainScreen(renderer *sdl.Renderer) (*MainScreen, error) {
+	screen := &MainScreen{
+		title:    "Tools",
+		renderer: renderer,
+		errorTextView: NewAlertView(
+			renderer,
+			sdl.Rect{X: 15, Y: 85, W: DisplayWidth - 30, H: DisplayHeight - 150},
+			TerminalFont,
+			ContentColor1,
+			HexToColor("#9AE4080A"),
+		),
+		lineView: NewAlertView(
+			renderer,
+			sdl.Rect{X: 15, Y: 85, W: DisplayWidth - 30, H: DisplayHeight - 150},
+			ContentFont1,
+			ContentColor1,
+			HexToColor("#9A000000"),
+		),
+		shellView: NewShellView(
+			renderer,
+			sdl.Rect{X: 15, Y: 85, W: DisplayWidth - 30, H: DisplayHeight - 150},
+			TerminalFont,
+			ContentColor1,
+			HexToColor("#9A000000"),
+			10,
+		),
+	}
+	listPosition := sdl.Point{X: 20, Y: 78}
+	mainlist := NewList(
+		renderer,
+		int(visibleItems),
+		listPosition,
+		func(index int, item Item[menuItem], selected bool) {
+			itemRect := sdl.Rect{X: listPosition.X, Y: listPosition.Y + (itemHeight+itemSpacing)*int32(index), W: 984, H: itemHeight}
+			screen.RenderListItem(renderer, item.Value, itemRect, selected)
+		},
+	)
+	screen.lists = make([]OptionsList, 0)
+	screen.lists = append(screen.lists, OptionsList{
+		Title: screen.title,
+		List:  mainlist,
+	})
+
+	return screen, nil
+}
+
+func (h *MainScreen) RenderListItem(renderer *sdl.Renderer, item menuItem, itemRect sdl.Rect, selected bool) {
+	if selected {
+		DrawTexture(renderer, ListItemSelTexture, itemRect)
+	} else {
+		DrawTexture(renderer, ListItemTexture, itemRect)
+	}
+
+	labelHeight := TextHeight(ContentFont1, item.Label)
+
+	textPos := sdl.Point{X: itemRect.X + 30, Y: itemRect.Y + 35}
+	if item.Description != "" {
+		textPos.Y = itemRect.Y + 20
+	}
+
+	if (item.Icon != "") && (item.IconTexture == nil) {
+		item.IconTexture, _ = LoadTexture(renderer, item.Icon)
+		if (item.Type == "menu") && (item.IconTexture == nil) {
+			item.IconTexture = FolderIconTexture
+		}
+	}
+
+	if item.IconTexture != nil {
+		DrawTexture(renderer, item.IconTexture, sdl.Rect{X: itemRect.X + 20, Y: itemRect.Y + 20, W: 80, H: 80})
+		textPos.X = itemRect.X + 110
+	}
+
+	DrawText(renderer, item.Label, textPos, ContentColor1, ContentFont1)
+
+	if item.Description != "" {
+		DrawText(renderer, item.Description, sdl.Point{X: textPos.X, Y: textPos.Y + int32(labelHeight) - 5}, ContentColor2, ContentFont2)
+	}
+
+	switch item.Type {
+	case "select":
+		if selected {
+			DrawTexture(renderer, OptionBgTexture, sdl.Rect{X: itemRect.X + itemRect.W - 490, Y: itemRect.Y + 30, W: 472, H: 60})
+			if item.Selected == 0 {
+				DrawTexture(renderer, LeftArrowDisabledTexture, sdl.Rect{X: itemRect.X + itemRect.W - 490, Y: itemRect.Y + 30, W: 60, H: 60})
+			} else {
+				DrawTexture(renderer, LeftArrowEnabledTexture, sdl.Rect{X: itemRect.X + itemRect.W - 490, Y: itemRect.Y + 30, W: 60, H: 60})
+			}
+			if item.Selected == len(item.SelectItems)-1 {
+				DrawTexture(renderer, RightArrowDisabledTexture, sdl.Rect{X: itemRect.X + itemRect.W - 80, Y: itemRect.Y + 30, W: 60, H: 60})
+			} else {
+				DrawTexture(renderer, RightArrowEnabledTexture, sdl.Rect{X: itemRect.X + itemRect.W - 80, Y: itemRect.Y + 30, W: 60, H: 60})
+			}
+		} else {
+			DrawTexture(renderer, LeftArrowDisabledTexture, sdl.Rect{X: itemRect.X + itemRect.W - 490, Y: itemRect.Y + 30, W: 60, H: 60})
+			DrawTexture(renderer, RightArrowDisabledTexture, sdl.Rect{X: itemRect.X + itemRect.W - 80, Y: itemRect.Y + 30, W: 60, H: 60})
+		}
+
+		fromX := (itemRect.X + itemRect.W - 490 + 60)
+		toX := (itemRect.X + itemRect.W - 80)
+		DrawTextCenter(renderer, item.SelectItems[item.Selected], sdl.Rect{X: fromX, Y: itemRect.Y + 30, W: toX - fromX, H: 60}, ContentColor1, ContentFont1, true, true)
+	case "toggle":
+		if item.Selected == 1 {
+			DrawTexture(renderer, SwitchOnTexture, sdl.Rect{X: itemRect.X + itemRect.W - 120, Y: itemRect.Y + 40, W: 90, H: 40})
+		} else {
+			DrawTexture(renderer, SwitchOffTexture, sdl.Rect{X: itemRect.X + itemRect.W - 120, Y: itemRect.Y + 40, W: 90, H: 40})
+		}
+	}
+}
+
+func (h *MainScreen) InitHome() {
+	if h.initialized {
+		return
+	}
+	items, err := loadItems()
+	if err != nil {
+		h.SetError(fmt.Sprintf("Error loading menu items.\n%s", err))
+	} else {
+		h.title = h.lists[len(h.lists)-1].Title
+		h.GetList().SetItems(items)
+	}
+	h.initialized = true
+}
+
+func (h *MainScreen) HandleInput(event InputEvent) {
+	switch event.KeyCode {
+	case "DOWN":
+		if h.InError() {
+			return
+		}
+		if h.InShell() {
+			if h.showShellView {
+				h.shellView.ScrollDown(1)
+			}
+			return
+		} else {
+			h.GetList().ScrollDown()
+		}
+	case "UP":
+		if h.InError() {
+			return
+		}
+		if h.InShell() {
+			if h.showShellView {
+				h.shellView.ScrollUp(1)
+			}
+			return
+		} else {
+			h.GetList().ScrollUp()
+		}
+	case "B":
+		if h.InShell() {
+			if h.IsExecuting() {
+				if h.shellCancel != nil {
+					h.shellCancel()
+				}
+			} else {
+				h.title = h.lists[len(h.lists)-1].Title
+				h.showShellView = false
+				h.showLineView = false
+			}
+			return
+		}
+
+		if h.InError() {
+			Close()
+			return
+		}
+
+		if len(h.lists) > 1 {
+			h.lists = h.lists[:len(h.lists)-1]
+			h.title = h.lists[len(h.lists)-1].Title
+		} else {
+			Close()
+		}
+	case "LEFT":
+		if h.InShell() || h.InError() {
+			return
+		}
+		h.ChangeSelection(h.GetList().SelectedItem(), "LEFT")
+	case "RIGHT":
+		if h.InShell() || h.InError() {
+			return
+		}
+		h.ChangeSelection(h.GetList().SelectedItem(), "RIGHT")
+	case "A":
+		if h.InError() {
+			return
+		}
+
+		if h.InShell() {
+			return
+		}
+
+		h.DoItemAction(h.GetList().SelectedItem())
+	case "SELECT":
+		if h.InError() {
+			return
+		}
+		if len(h.shellView.GetText()) > 0 {
+			h.showLineView = false
+			h.showShellView = true
+		}
+	}
+}
+
+func (h *MainScreen) GetList() *List[menuItem] {
+	return h.lists[len(h.lists)-1].List
+}
+
+func (h *MainScreen) GetTitle() string {
+	return h.title
+}
+
+func (h *MainScreen) InError() bool {
+	return len(h.errorTextView.GetText()) > 0
+}
+
+func (h *MainScreen) SetError(errorMsg string) {
+	h.errorTextView.SetText(errorMsg)
+}
+
+func (h *MainScreen) InShell() bool {
+	return h.showShellView || h.showLineView
+}
+
+func (h *MainScreen) IsExecuting() bool {
+	return h.shellRunnning
+}
+
+func (h *MainScreen) ChangeSelection(item *menuItem, direction string) {
+	switch item.Type {
+	case "select":
+		if direction == "RIGHT" {
+			if item.Selected < len(item.SelectItems)-1 {
+				item.Selected++
+			}
+		}
+
+		if direction == "LEFT" {
+			if item.Selected > 0 {
+				item.Selected--
+			}
+		}
+	}
+}
+
+func (h *MainScreen) DoItemAction(item *menuItem) {
+	switch item.Type {
+	case "menu":
+		h.OpenSubmenu(item)
+	case "cmd":
+		h.RunCommandCaptured(item)
+	case "toggle":
+		h.RunCommandCaptured(item)
+	case "select":
+		h.RunCommandCaptured(item)
+	}
+}
+
+func (h *MainScreen) RunCommandCaptured(item *menuItem) {
+	if item.Execute == "" {
+		return
+	}
+	h.showLineView = item.Output == "line"
+	h.showShellView = item.Output == "full"
+	if h.showLineView || h.showShellView {
+		h.title = item.Label
+	}
+	cmd := item.Execute
+	if (item.Type == "select") || (item.Type == "toggle") {
+		cmd = fmt.Sprintf("%s %d", cmd, item.Selected)
+	}
+	h.shellView.Clear()
+	h.lineView.SetText("")
+	shell.RunCommand(cmd, func(event shell.ShellEvent) {
+		switch event.Type {
+		case "start":
+			h.shellRunnning = true
+			h.shellView.AddText("Executing: " + event.Data)
+		case "output":
+			data := strings.ReplaceAll(event.Data, "\\n", "\n")
+			if h.showLineView {
+				h.lineView.SetText(data)
+			}
+			h.shellView.AddText(data)
+		case "error":
+			h.shellView.AddText(event.Data)
+		case "exit":
+			h.shellView.AddText("Exit code: " + event.Data)
+			exitCode, err := strconv.Atoi(event.Data)
+			if err != nil {
+				h.shellView.AddText("Error parsing exit code: " + err.Error())
+				exitCode = 1
+			}
+			if exitCode != 0 {
+				h.showLineView = false
+				h.showShellView = true
+			}
+			if h.shellCancel != nil {
+				h.shellCancel()
+			}
+			if (item.Type == "toggle") && (exitCode == 0) {
+				item.Selected = 1 - item.Selected
+			}
+		case "end":
+			h.shellRunnning = false
+		}
+	})
+}
+
+func (h *MainScreen) OpenSubmenu(item *menuItem) {
+	if len(item.MenuItems) == 0 {
+		return
+	}
+	//create a new list, add it to the lists slice and set it as the current list
+	submenuList := NewList(
+		h.renderer,
+		int(visibleItems),
+		sdl.Point{X: 20, Y: 72},
+		func(index int, item Item[menuItem], selected bool) {
+			itemRect := sdl.Rect{X: 20, Y: 72 + (itemHeight+itemSpacing)*int32(index), W: 984, H: itemHeight}
+			h.RenderListItem(h.renderer, item.Value, itemRect, selected)
+		},
+	)
+	h.lists = append(h.lists, OptionsList{
+		Title: item.Label,
+		List:  submenuList,
+	})
+	subitems := make([]Item[menuItem], len(item.MenuItems))
+	for i, item := range item.MenuItems {
+		subitems[i] = Item[menuItem]{
+			Label: item.Label,
+			Value: item,
+		}
+	}
+	h.title = h.lists[len(h.lists)-1].Title
+	h.GetList().SetItems(subitems)
+}
+
+func (h *MainScreen) DrawThemeTextures() {
+	DrawTexture(h.renderer, BackgroundTexture, sdl.Rect{X: 0, Y: 0, W: DisplayWidth, H: DisplayHeight})
+	DrawTexture(h.renderer, TitleBarTexture, sdl.Rect{X: 0, Y: 0, W: DisplayWidth, H: 70})
+	DrawTexture(h.renderer, TipsBarTexture, sdl.Rect{X: 0, Y: DisplayHeight - 50, W: DisplayWidth, H: 50})
+}
+
+func (h *MainScreen) DrawTitle() {
+	DrawTexture(h.renderer, IconTrimuiTexture, sdl.Rect{X: 20, Y: 15, W: 40, H: 40})
+	DrawText(h.renderer, h.GetTitle(), sdl.Point{X: 75, Y: 10}, ContentColor1, ContentFont1)
+}
+
+func (h *MainScreen) DrawTip(renderer *sdl.Renderer, texture *sdl.Texture, text string, position sdl.Point) int32 {
+	width := int32(30)
+	_, _, width, _, err := texture.Query()
+	if err != nil {
+		width = 30
+	}
+	DrawTexture(renderer, texture, sdl.Rect{X: position.X, Y: position.Y, W: width, H: 30})
+	DrawTextCenter(renderer, text, sdl.Rect{X: position.X + width + 10, Y: position.Y, W: 30, H: 30}, ContentColor1, ContentFont6, true, false)
+	return position.X + width + 10 + int32(TextWidth(ContentFont6, text)) + 10
+}
+
+func (h *MainScreen) DrawItemTips(item *menuItem, xPos int32) int32 {
+	tipPos := sdl.Point{X: xPos, Y: DisplayHeight - 40}
+
+	if item.Type == "cmd" {
+		tipPos.X = h.DrawTip(h.renderer, TipsATexture, "Run command", tipPos)
+	}
+
+	if item.Type == "menu" {
+		tipPos.X = h.DrawTip(h.renderer, TipsATexture, "Open Folder", tipPos)
+	}
+
+	if item.Type == "toggle" {
+		if item.Selected == 1 {
+			tipPos.X = h.DrawTip(h.renderer, TipsATexture, "Disable", tipPos)
+		} else {
+			tipPos.X = h.DrawTip(h.renderer, TipsATexture, "Enable", tipPos)
+		}
+	}
+
+	if item.Type == "select" {
+		tipPos.X = h.DrawTip(h.renderer, TipsATexture, "Set option", tipPos)
+	}
+
+	if len(h.lists) > 1 {
+		tipPos.X = h.DrawTip(h.renderer, TipsBTexture, "Back", tipPos)
+	} else {
+		tipPos.X = h.DrawTip(h.renderer, TipsBTexture, "Exit", tipPos)
+	}
+
+	return tipPos.X
+}
+
+func (h *MainScreen) Draw() {
+	h.InitHome()
+	tipPos := int32(20)
+	_ = h.renderer.SetDrawColor(0, 0, 0, 255)
+	_ = h.renderer.Clear()
+
+	h.DrawThemeTextures()
+	if h.InError() {
+		h.errorTextView.Draw()
+		tipPos += h.DrawTip(h.renderer, TipsBTexture, "Exit", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
+	} else {
+		if h.InShell() {
+			if h.showLineView {
+				h.lineView.Draw()
+			} else {
+				h.shellView.Draw()
+			}
+			if h.IsExecuting() {
+				tipPos += h.DrawTip(h.renderer, TipsBTexture, "Cancel", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
+			} else {
+				tipPos += h.DrawTip(h.renderer, TipsBTexture, "Back", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
+			}
+		} else {
+			h.GetList().Draw()
+			tipPos += h.DrawItemTips(h.GetList().SelectedItem(), tipPos)
+		}
+
+		if len(h.shellView.GetText()) > 0 && !h.showShellView && !h.IsExecuting() {
+			tipPos += h.DrawTip(h.renderer, TipsSelectTexture, "Show output", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
+		}
+	}
+	h.DrawTitle()
+	h.renderer.Present()
+}
+
+func loadItems() ([]Item[menuItem], error) {
+
+	//load items from the menu.json file
+	file, err := os.ReadFile("./menu.json")
+	if err != nil {
+		return nil, err
+	}
+
+	var data []menuItem
+	err = json.Unmarshal(file, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]Item[menuItem], len(data))
+	for i, item := range data {
+		items[i] = Item[menuItem]{
+			Label: item.Label,
+			Value: item,
+		}
+	}
+	return items, nil
+}
