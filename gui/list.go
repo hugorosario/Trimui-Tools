@@ -21,6 +21,10 @@ type List[T any] struct {
 	position        sdl.Point
 }
 
+func (l *List[T]) GetItems() []Item[T] {
+	return l.items
+}
+
 func NewList[T any](renderer *sdl.Renderer, maxVisibleItems int, position sdl.Point, renderItem renderItemFunc[T]) *List[T] {
 	return &List[T]{
 		renderer:        renderer,
@@ -77,7 +81,7 @@ func (l *List[T]) Draw() {
 	if endIndex > len(l.items) {
 		endIndex = len(l.items)
 	}
-	visibleItems := l.items[startIndex:endIndex]
+	visibleItems := (l.items)[startIndex:endIndex]
 
 	for index, item := range visibleItems {
 		selected := index+startIndex == l.selectedIndex
@@ -93,13 +97,13 @@ func (l *List[T]) GetScrollOffset() int {
 	return l.scrollOffset
 }
 
-func (l *List[T]) SelectedItem() *T {
+func (l *List[T]) SelectedItem() T {
 	if len(l.items) == 0 {
 		var zeroValue T
-		return &zeroValue
+		return zeroValue
 	}
 
-	return &l.items[l.selectedIndex].Value
+	return (l.items)[l.selectedIndex].Value
 }
 
 func (l *List[T]) GetValues() []T {

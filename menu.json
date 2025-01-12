@@ -1,262 +1,37 @@
 [
-    {
-        "label": "Network",
-        "type": "menu",
-        "icon": "folder_icon.png",
-        "description": "Network related tools and settings",
-        "menu": [
-            {
-                "label": "List files",
-                "type": "cmd",
-                "icon": "subitem_icon1.png",
-                "execute": "ls -al ./theme/skin",
-                "output": "full"
-            },
-            {
-                "label": "Display IP Address",
-                "type": "cmd",
-                "icon": "subitem_icon1.png",
-                "execute": "./test.sh",
-                "output": "line"
-            },            
-            {
-                "label": "Sub Toggle",
-                "type": "toggle",
-                "icon": "subitem_icon2.png",
-                "execute": "./test.sh",
-                "selected": 1,
-                "output": "none"
-            }
-        ]
-    },
-    {
-        "label": "SubFolder 2",
-        "type": "menu",
-        "icon": "folder_icon.png",
-        "description":"This is another subfolder",
-        "menu": [
-            {
-                "label": "Sub command",
-                "type": "cmd",
-                "icon": "subitem_icon1.png",
-                "execute": "subcommand1"
-            },
-            {
-                "label": "Sub Toggle",
-                "type": "toggle",
-                "icon": "subitem_icon2.png",
-                "execute": "subtoggle_command",
-                "selected": 0
-            },
-            {
-                "label": "SubSubFolder",
-                "type": "menu",
-                "icon": "folder_icon.png",
-                "menu": [
-                    {
-                        "label": "Sub command",
-                        "type": "cmd",
-                        "icon": "subitem_icon1.png",
-                        "execute": "subcommand1"
-                    },
-                    {
-                        "label": "Sub Toggle",
-                        "type": "toggle",
-                        "icon": "subitem_icon2.png",
-                        "execute": "subtoggle_command",
-                        "selected": 1
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "label": "Toggle Item",
+  {
+    "label": "Network",
+    "type": "menu",
+    "icon": "folder_icon.png",
+    "description": "Network related tools and settings",
+    "menu": [
+      {
+        "label": "SFTPGo Server {listening}",
+        "description": "Enable/Disable SFTPGo Server",
         "type": "toggle",
-        "icon": "toggle_icon.png",
-        "execute": "toggle_command",
-        "description": "this is a toogle switch",
-        "selected": 1
-    },
-    {
-        "label": "Select Item 1",
-        "type": "select",
-        "icon": "select_icon.png",
-        "execute": "select_command",
-        "description": "this is a selection list",
-        "items": [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth"
-        ],
-        "selected": 0
-    },    
-    {
-        "label": "Select Item 2",
-        "type": "select",
-        "icon": "select_icon.png",
-        "execute": "select_command",
-        "items": [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth"
-        ],
-        "selected": 2
-    },    
-    {
-        "label": "Select Item 3",
-        "type": "select",
-        "icon": "select_icon.png",
-        "execute": "select_command",
-        "items": [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth"
-        ],
-        "selected": 4
-    },    
-    {
-        "label": "Select Item 4",
-        "type": "select",
-        "icon": "select_icon.png",
-        "execute": "select_command",
-        "items": [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth"
-        ],
-        "selected": 5
-    },    
-    {
-        "label": "Select Item 5",
-        "type": "select",
-        "icon": "select_icon.png",
-        "execute": "select_command",
-        "items": [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth"
-        ],
-        "selected": 1
-    },    
-    {
-        "label": "Select Item 6",
-        "type": "select",
-        "icon": "select_icon.png",
-        "execute": "select_command",
-        "items": [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth"
-        ],
-        "selected": 3
-    },    
-    {
-        "label": "Select Item 7",
-        "type": "select",
-        "icon": "select_icon.png",
-        "execute": "select_command",
-        "items": [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth"
-        ],
-        "selected": 0
-    },    
-    {
-        "label": "Select Item 8",
-        "type": "select",
-        "icon": "select_icon.png",
-        "execute": "select_command",
-        "items": [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth"
-        ],
-        "selected": 2
-    },    
-    {
-        "label": "Command Item 1",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 2",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 3",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 4",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 5",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 6",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 7",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 8",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 9",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    },
-    {
-        "label": "Command Item 10",
-        "type": "cmd",
-        "icon": "command_icon.png",
-        "execute": "command_item"
-    }    
+        "icon": "subitem_icon1.png",
+        "execute": "./scripts/sftpgo.sh",
+        "output": "none",
+        "load": "./scripts/sftpgo.sh check"
+      },
+      {
+        "label": "SSH Server {listening}",
+        "description": "Enable/Disable SSH Server (dropbear)",
+        "type": "toggle",
+        "icon": "subitem_icon1.png",
+        "execute": "./scripts/sshd.sh",
+        "output": "none",
+        "load": "./scripts/sshd.sh check"
+      },
+      {
+        "label": "Syncthing {listening}",
+        "description": "Enable/Disable Syncthing",
+        "type": "toggle",
+        "icon": "subitem_icon1.png",
+        "execute": "./scripts/syncthing.sh",
+        "output": "none",
+        "load": "./scripts/syncthing.sh check"
+      }      
+    ]
+  }
 ]

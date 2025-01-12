@@ -62,3 +62,12 @@ func RunCommand(cmd string, event func(event ShellEvent)) (cancel context.Cancel
 
 	return cancel, nil
 }
+
+func RunCommandSync(cmd string) (output string, err error) {
+	command := exec.Command("sh", "-c", cmd)
+	stdout, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(stdout), nil
+}

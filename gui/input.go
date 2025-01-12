@@ -46,7 +46,7 @@ func StartInputListener() {
 		sdl.SCANCODE_X:      "X",
 		sdl.SCANCODE_Y:      "Y",
 		sdl.SCANCODE_RETURN: "START",
-		sdl.SCANCODE_ESCAPE: "SELECT",
+		sdl.SCANCODE_SPACE:  "SELECT",
 	}
 
 	// State tracking for debounce and repeat
