@@ -29,3 +29,7 @@ go.work.sum
 /Menu
 /empty.png
 /terminal.ttf
+/scripts
+/menu.json
+/package.sh
+/init.sh

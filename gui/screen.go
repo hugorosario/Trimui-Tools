@@ -24,58 +24,70 @@ type OptionsList struct {
 }
 
 type MainScreen struct {
-	renderer      *sdl.Renderer
-	lists         []OptionsList
-	errorTextView *AlertView
-	lineView      *AlertView
-	initialized   bool
-	title         string
-	shellView     *ShellView
-	showShellView bool
-	shellRunnning bool
-	showLineView  bool
-	shellCancel   context.CancelFunc
+	renderer       *sdl.Renderer
+	shellView      *ShellView
+	errorTextView  *AlertView
+	lineView       *AlertView
+	dialogView     *AlertView
+	lists          []OptionsList
+	initialized    bool
+	title          string
+	showShellView  bool
+	shellRunnning  bool
+	showLineView   bool
+	showDialogView bool
+	shellInput     chan string
+	shellCancel    context.CancelFunc
 }
 
 type menuItem struct {
-	Label       string       `json:"label"`
-	Type        string       `json:"type"` // "toggle", "select", "menu", "cmd"
-	Icon        string       `json:"icon,omitempty"`
-	Description string       `json:"description,omitempty"`
-	Load        string       `json:"load,omitempty"`
-	Execute     string       `json:"execute,omitempty"`
-	Output      string       `json:"output,omitempty"`
-	SelectItems []string     `json:"items,omitempty"`
-	Selected    int          `json:"selected,omitempty"`
-	MenuItems   []*menuItem  `json:"menu,omitempty"`
-	IconTexture *sdl.Texture `json:"-"`
+	Label              string       `json:"label"`                 // label of the item
+	Type               string       `json:"type"`                  // "toggle", "select", "menu", "cmd"
+	Icon               string       `json:"icon,omitempty"`        // icon file path
+	Description        string       `json:"description,omitempty"` // summary description of the item
+	Load               string       `json:"load,omitempty"`        // command to execute when status needs to be loaded
+	Execute            string       `json:"execute,omitempty"`     // command to execute
+	Output             string       `json:"output,omitempty"`      // "line", "full", "none"
+	SelectItems        []string     `json:"items,omitempty"`       // items for select type
+	Selected           int          `json:"selected,omitempty"`    // index of the selected item
+	MenuItems          []*menuItem  `json:"menu,omitempty"`        // sub menu items
+	IconTexture        *sdl.Texture `json:"-"`                     // texture for the icon
+	DisplayLabel       string       `json:"-"`                     // parsed label with tags replaced
+	DisplayDescription string       `json:"-"`                     // parsed description with tags replaced
 }
 
 func NewMainScreen(renderer *sdl.Renderer) (*MainScreen, error) {
+	title, err := readJsonFileProperty("config.json", "label")
+	if err != nil {
+		title = "System Tools"
+	}
 	screen := &MainScreen{
-		title:    "Tools",
+		title:    title,
 		renderer: renderer,
 		errorTextView: NewAlertView(
 			renderer,
 			sdl.Rect{X: 0, Y: 75, W: DisplayWidth, H: DisplayHeight - 125},
-			TerminalFont,
+			ContentFont1,
 			ContentColor1,
 			HexToColor("#9AE4080A"),
 		),
 		lineView: NewAlertView(
 			renderer,
-			sdl.Rect{X: 0, Y: 75, W: DisplayWidth, H: DisplayHeight - 125},
+			sdl.Rect{X: 0, Y: 70, W: DisplayWidth, H: DisplayHeight - 120},
 			ContentFont1,
 			ContentColor1,
 			HexToColor("#9A000000"),
 		),
+		dialogView: NewAlertView(
+			renderer,
+			sdl.Rect{X: 0, Y: 70, W: DisplayWidth, H: DisplayHeight - 120},
+			ContentFont1,
+			ContentColor1,
+			HexToColor("#00FFFFFF"),
+		),
 		shellView: NewShellView(
 			renderer,
-			sdl.Rect{X: 0, Y: 75, W: DisplayWidth, H: DisplayHeight - 125},
-			TerminalFont,
-			ContentColor1,
-			HexToColor("#9A000000"),
-			10,
+			sdl.Rect{X: 0, Y: 70, W: DisplayWidth, H: DisplayHeight - 120},
 		),
 	}
 	listPosition := sdl.Point{X: 20, Y: 78}
@@ -104,18 +116,18 @@ func (h *MainScreen) RenderListItem(renderer *sdl.Renderer, item *menuItem, item
 		DrawTexture(renderer, ListItemTexture, itemRect)
 	}
 
-	labelHeight := TextHeight(ContentFont1, item.Label)
+	labelHeight := TextHeight(ContentFont1, item.DisplayLabel)
 
 	textPos := sdl.Point{X: itemRect.X + 30, Y: itemRect.Y + 35}
-	if item.Description != "" {
+	if item.DisplayDescription != "" {
 		textPos.Y = itemRect.Y + 20
 	}
 
 	if (item.Icon != "") && (item.IconTexture == nil) {
 		item.IconTexture, _ = LoadTexture(renderer, item.Icon)
-		if (item.Type == "menu") && (item.IconTexture == nil) {
-			item.IconTexture = FolderIconTexture
-		}
+	}
+	if (item.Type == "menu") && (item.IconTexture == nil) {
+		item.IconTexture = FolderIconTexture
 	}
 
 	if item.IconTexture != nil {
@@ -123,10 +135,10 @@ func (h *MainScreen) RenderListItem(renderer *sdl.Renderer, item *menuItem, item
 		textPos.X = itemRect.X + 110
 	}
 
-	DrawText(renderer, item.Label, textPos, ContentColor1, ContentFont1)
+	DrawText(renderer, item.DisplayLabel, textPos, ContentColor1, ContentFont1)
 
-	if item.Description != "" {
-		DrawText(renderer, item.Description, sdl.Point{X: textPos.X, Y: textPos.Y + int32(labelHeight) - 5}, ContentColor2, ContentFont2)
+	if item.DisplayDescription != "" {
+		DrawText(renderer, item.DisplayDescription, sdl.Point{X: textPos.X, Y: textPos.Y + int32(labelHeight) - 5}, ContentColor2, ContentFont6)
 	}
 
 	switch item.Type {
@@ -164,6 +176,16 @@ func (h *MainScreen) InitHome() {
 	if h.initialized {
 		return
 	}
+	_ = h.renderer.SetDrawColor(0, 0, 0, 255)
+	DrawTextCenter(h.renderer, "Loading...", sdl.Rect{X: 0, Y: 0, W: DisplayWidth, H: DisplayHeight}, ContentColor1, ContentFont1, true, true)
+	h.renderer.Present()
+
+	//execute the ./init.sh script if it exists
+	_, err := os.Stat("./init.sh")
+	if err == nil {
+		_, _ = shell.RunCommandSync("./init.sh")
+	}
+
 	items, err := h.loadItems()
 	if err != nil {
 		h.SetError(fmt.Sprintf("Error loading menu items.\n%s", err))
@@ -175,6 +197,9 @@ func (h *MainScreen) InitHome() {
 }
 
 func (h *MainScreen) HandleInput(event InputEvent) {
+	if !h.initialized {
+		return
+	}
 	switch event.KeyCode {
 	case "DOWN":
 		if h.InError() {
@@ -203,7 +228,12 @@ func (h *MainScreen) HandleInput(event InputEvent) {
 	case "B":
 		if h.InShell() {
 			if h.IsExecuting() {
-				if h.shellCancel != nil {
+				if h.InDialog() {
+					h.showDialogView = false
+					if h.shellInput != nil {
+						h.shellInput <- event.KeyCode + "\n"
+					}
+				} else if h.shellCancel != nil {
 					h.shellCancel()
 				}
 			} else {
@@ -241,6 +271,12 @@ func (h *MainScreen) HandleInput(event InputEvent) {
 		}
 
 		if h.InShell() {
+			if h.InDialog() && h.IsExecuting() {
+				h.showDialogView = false
+				if h.shellInput != nil {
+					h.shellInput <- event.KeyCode + "\n"
+				}
+			}
 			return
 		}
 
@@ -273,11 +309,15 @@ func (h *MainScreen) SetError(errorMsg string) {
 }
 
 func (h *MainScreen) InShell() bool {
-	return h.showShellView || h.showLineView
+	return h.showShellView || h.showLineView || h.showDialogView
 }
 
 func (h *MainScreen) IsExecuting() bool {
 	return h.shellRunnning
+}
+
+func (h *MainScreen) InDialog() bool {
+	return h.showDialogView
 }
 
 func (h *MainScreen) ChangeSelection(item *menuItem, direction string) {
@@ -300,6 +340,7 @@ func (h *MainScreen) ChangeSelection(item *menuItem, direction string) {
 func (h *MainScreen) DoItemAction(item *menuItem) {
 	switch item.Type {
 	case "menu":
+		h.runLoadCommands(item)
 		h.OpenSubmenu(item)
 	case "cmd":
 		h.RunCommandCaptured(item)
@@ -317,29 +358,43 @@ func (h *MainScreen) RunCommandCaptured(item *menuItem) {
 	}
 	h.showLineView = item.Output == "line"
 	h.showShellView = item.Output == "full"
+	h.showDialogView = false
 	if h.showLineView || h.showShellView {
-		h.title = item.Label
+		h.title = item.DisplayLabel
 	}
+
 	cmd := item.Execute
 	if (item.Type == "select") || (item.Type == "toggle") {
 		cmd = fmt.Sprintf("%s %d", cmd, item.Selected)
 	}
 	h.shellView.Clear()
 	h.lineView.SetText("")
-	shell.RunCommand(cmd, func(event shell.ShellEvent) {
+	h.dialogView.SetText("")
+	h.shellInput, h.shellCancel, _ = shell.RunCommandAsync(cmd, func(event shell.ShellEvent) {
 		switch event.Type {
 		case "start":
 			h.shellRunnning = true
 			h.shellView.AddText("Executing: " + event.Data)
 		case "output":
+			//if contains tags in between {{ and }}, ignore this output
+			if strings.Contains(event.Data, "{{") && strings.Contains(event.Data, "}}") {
+				return
+			}
 			data := strings.ReplaceAll(event.Data, "\\n", "\n")
-			if h.showLineView {
+			//example of confirm dialog: confirm:ok:cancel:Are you sure you want to continue
+			//check if prefix is for showing a confirm dialog
+			if strings.HasPrefix(data, "confirm:") {
+				h.dialogView.SetText(strings.TrimPrefix(data, "confirm:"))
+				h.title = item.DisplayLabel
+				h.showDialogView = true
+			} else if h.showLineView {
 				h.lineView.SetText(data)
 			}
 			h.shellView.AddText(data)
 		case "error":
 			h.shellView.AddText(event.Data)
 		case "exit":
+			h.showDialogView = false
 			h.shellView.AddText("Exit code: " + event.Data)
 			exitCode, err := strconv.Atoi(event.Data)
 			if err != nil {
@@ -356,9 +411,15 @@ func (h *MainScreen) RunCommandCaptured(item *menuItem) {
 			if (item.Type == "toggle") && (exitCode != 0) {
 				item.Selected = 1 - item.Selected
 			}
+
 			h.runLoadCommands(item)
 		case "end":
 			h.shellRunnning = false
+			h.title = h.lists[len(h.lists)-1].Title
+			//run load commands for all menu items
+			for _, item := range h.GetList().GetItems() {
+				h.runLoadCommands(item.Value)
+			}
 		}
 	})
 }
@@ -378,13 +439,13 @@ func (h *MainScreen) OpenSubmenu(item *menuItem) {
 		},
 	)
 	h.lists = append(h.lists, OptionsList{
-		Title: item.Label,
+		Title: item.DisplayLabel,
 		List:  submenuList,
 	})
 	subitems := make([]Item[*menuItem], len(item.MenuItems))
 	for i, item := range item.MenuItems {
 		subitems[i] = Item[*menuItem]{
-			Label: item.Label,
+			Label: item.DisplayLabel,
 			Value: item,
 		}
 	}
@@ -410,8 +471,8 @@ func (h *MainScreen) DrawTip(renderer *sdl.Renderer, texture *sdl.Texture, text 
 		width = 30
 	}
 	DrawTexture(renderer, texture, sdl.Rect{X: position.X, Y: position.Y, W: width, H: 30})
-	DrawTextCenter(renderer, text, sdl.Rect{X: position.X + width + 10, Y: position.Y, W: 30, H: 30}, ContentColor1, ContentFont6, true, false)
-	return position.X + width + 10 + int32(TextWidth(ContentFont6, text)) + 10
+	DrawTextCenter(renderer, text, sdl.Rect{X: position.X + width + 10, Y: position.Y, W: 30, H: 30}, ContentColor1, ContentFont2, true, false)
+	return position.X + width + 10 + int32(TextWidth(ContentFont2, text)) + 10
 }
 
 func (h *MainScreen) DrawItemTips(item *menuItem, xPos int32) int32 {
@@ -453,20 +514,29 @@ func (h *MainScreen) Draw() {
 	_ = h.renderer.Clear()
 
 	h.DrawThemeTextures()
-	if h.InError() {
+	h.DrawTitle()
+	if !h.initialized && h.showLineView {
+		h.lineView.Draw()
+	} else if h.InError() {
 		h.errorTextView.Draw()
 		tipPos += h.DrawTip(h.renderer, TipsBTexture, "Exit", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
 	} else {
 		if h.InShell() {
-			if h.showLineView {
-				h.lineView.Draw()
-			} else {
-				h.shellView.Draw()
-			}
-			if h.IsExecuting() {
+			if h.showDialogView && h.IsExecuting() {
+				h.dialogView.Draw()
+				tipPos += h.DrawTip(h.renderer, TipsATexture, "OK", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
 				tipPos += h.DrawTip(h.renderer, TipsBTexture, "Cancel", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
 			} else {
-				tipPos += h.DrawTip(h.renderer, TipsBTexture, "Back", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
+				if h.showLineView {
+					h.lineView.Draw()
+				} else {
+					h.shellView.Draw()
+				}
+				if h.IsExecuting() {
+					tipPos += h.DrawTip(h.renderer, TipsBTexture, "Cancel", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
+				} else {
+					tipPos += h.DrawTip(h.renderer, TipsBTexture, "Back", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
+				}
 			}
 		} else {
 			h.GetList().Draw()
@@ -477,7 +547,6 @@ func (h *MainScreen) Draw() {
 			tipPos += h.DrawTip(h.renderer, TipsSelectTexture, "Show output", sdl.Point{X: tipPos, Y: DisplayHeight - 40})
 		}
 	}
-	h.DrawTitle()
 	h.renderer.Present()
 }
 
@@ -497,24 +566,21 @@ func (h *MainScreen) loadItems() ([]Item[*menuItem], error) {
 	items := make([]Item[*menuItem], len(data))
 	for i, item := range data {
 		items[i] = Item[*menuItem]{
-			Label: item.Label,
+			Label: item.DisplayLabel,
 			Value: &item,
 		}
 	}
 
-	h.showLineView = true
-	h.lineView.SetText("Loading menu items...")
 	//run the load commands for all menu items
 	for _, item := range items {
 		h.runLoadCommands(item.Value)
 	}
-	h.lineView.SetText("")
-	h.showLineView = false
-
 	return items, nil
 }
 
 func (h *MainScreen) runLoadCommands(item *menuItem) {
+	item.DisplayLabel = item.Label
+	item.DisplayDescription = item.Description
 	labelTags := getTags(item.Label)
 	descriptionTags := getTags(item.Description)
 
@@ -545,14 +611,14 @@ func (h *MainScreen) runLoadCommands(item *menuItem) {
 					//replace the tag in the label and description
 					for i, labelTag := range labelTags {
 						if strings.Contains(labelTag, key) {
-							item.Label = strings.ReplaceAll(item.Label, "{"+labelTag+"}", value)
+							item.DisplayLabel = strings.ReplaceAll(item.DisplayLabel, "{{"+labelTag+"}}", value)
 							labelTags = append(labelTags[:i], labelTags[i+1:]...)
 						}
 					}
 
 					for i, descriptionTag := range descriptionTags {
 						if strings.Contains(descriptionTag, key) {
-							item.Description = strings.ReplaceAll(item.Description, "{"+descriptionTag+"}", value)
+							item.DisplayDescription = strings.ReplaceAll(item.DisplayDescription, "{{"+descriptionTag+"}}", value)
 							descriptionTags = append(descriptionTags[:i], descriptionTags[i+1:]...)
 						}
 					}
@@ -563,11 +629,11 @@ func (h *MainScreen) runLoadCommands(item *menuItem) {
 
 	//replace any remaining tags with empty strings
 	for _, labelTag := range labelTags {
-		item.Label = strings.ReplaceAll(item.Label, "{"+labelTag+"}", "")
+		item.DisplayLabel = strings.ReplaceAll(item.DisplayLabel, "{{"+labelTag+"}}", "")
 	}
 
 	for _, descriptionTag := range descriptionTags {
-		item.Description = strings.ReplaceAll(item.Description, "{"+descriptionTag+"}", "")
+		item.DisplayDescription = strings.ReplaceAll(item.DisplayDescription, "{{"+descriptionTag+"}}", "")
 	}
 
 	//recursively run the load commands for all menu items
@@ -577,11 +643,11 @@ func (h *MainScreen) runLoadCommands(item *menuItem) {
 }
 
 func getTags(s string) []string {
-	//extract all tags that are demlimited by { and }
+	//extract all tags that are demlimited by {{ and }}
 	tags := make([]string, 0)
-	for _, tag := range strings.Split(s, "{") {
-		if strings.Contains(tag, "}") {
-			tags = append(tags, strings.Split(tag, "}")[0])
+	for _, tag := range strings.Split(s, "{{") {
+		if strings.Contains(tag, "}}") {
+			tags = append(tags, strings.Split(tag, "}}")[0])
 		}
 	}
 	return tags

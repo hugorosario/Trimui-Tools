@@ -21,18 +21,19 @@ type ShellView struct {
 	padding      int32
 }
 
-func NewShellView(renderer *sdl.Renderer, position sdl.Rect, font *ttf.Font, color sdl.Color, bgColor sdl.Color, padding int32) *ShellView {
-	return &ShellView{
+func NewShellView(renderer *sdl.Renderer, position sdl.Rect) *ShellView {
+	view := &ShellView{
 		renderer:     renderer,
 		position:     position,
-		font:         font,
-		color:        &color,
-		bgColor:      &bgColor,
-		lineHeight:   TextHeight(font, "A"),
-		charWidth:    TextWidth(font, "A"),
+		font:         TerminalFont,
 		maxLineWidth: int(position.W),
-		padding:      padding,
 	}
+	view.padding = 10
+	view.lineHeight = TextHeight(view.font, "A")
+	view.charWidth = TextWidth(view.font, "A")
+	view.color = &sdl.Color{R: 255, G: 255, B: 255, A: 255}
+	view.bgColor = &sdl.Color{R: 0, G: 0, B: 0, A: 128}
+	return view
 }
 
 func (t *ShellView) SetContent(text string) {
@@ -44,7 +45,8 @@ func (t *ShellView) parseLines(lines []string) []string {
 	var parsedLines []string
 	for _, line := range lines {
 		if len(line) > 0 {
-			parsedLines = append(parsedLines, WrapText(line, t.charWidth, t.maxLineWidth)...)
+			wrappedLines := WrapText(line, t.charWidth, t.maxLineWidth)
+			parsedLines = append(parsedLines, wrappedLines...)
 		}
 	}
 	return parsedLines

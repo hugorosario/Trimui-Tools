@@ -12,10 +12,12 @@ type ShellEvent struct {
 	Data string
 }
 
-func RunCommand(cmd string, event func(event ShellEvent)) (cancel context.CancelFunc, err error) {
+func RunCommandAsync(cmd string, event func(event ShellEvent)) (stdinChannel chan string, cancel context.CancelFunc, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	eventChannel := make(chan ShellEvent)
-	go func(ctx context.Context, outputChannel chan<- ShellEvent) {
+	stdinChannel = make(chan string)
+
+	go func(ctx context.Context, outputChannel chan<- ShellEvent, stdinChannel <-chan string) {
 		defer close(eventChannel)
 		outputChannel <- ShellEvent{Type: "start", Data: cmd}
 
@@ -26,14 +28,31 @@ func RunCommand(cmd string, event func(event ShellEvent)) (cancel context.Cancel
 			return
 		}
 
+		stdinPipe, err := command.StdinPipe()
+		if err != nil {
+			outputChannel <- ShellEvent{Type: "error", Data: err.Error()}
+			return
+		}
+
 		if err := command.Start(); err != nil {
 			outputChannel <- ShellEvent{Type: "error", Data: err.Error()}
 			return
 		}
 
+		go func() {
+			for data := range stdinChannel {
+				_, err := fmt.Fprint(stdinPipe, data)
+				if err != nil {
+					outputChannel <- ShellEvent{Type: "error", Data: err.Error()}
+					return
+				}
+			}
+		}()
+
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			outputChannel <- ShellEvent{Type: "output", Data: scanner.Text()}
+			data := scanner.Text()
+			outputChannel <- ShellEvent{Type: "output", Data: data}
 		}
 
 		if err := scanner.Err(); err != nil {
@@ -52,7 +71,7 @@ func RunCommand(cmd string, event func(event ShellEvent)) (cancel context.Cancel
 		}
 
 		outputChannel <- ShellEvent{Type: "end", Data: cmd}
-	}(ctx, eventChannel)
+	}(ctx, eventChannel, stdinChannel)
 
 	go func() {
 		for e := range eventChannel {
@@ -60,7 +79,7 @@ func RunCommand(cmd string, event func(event ShellEvent)) (cancel context.Cancel
 		}
 	}()
 
-	return cancel, nil
+	return stdinChannel, cancel, nil
 }
 
 func RunCommandSync(cmd string) (output string, err error) {

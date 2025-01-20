@@ -110,6 +110,9 @@ func DrawTextCenter(renderer *sdl.Renderer, text string, rect sdl.Rect, color sd
 
 // RenderText renders text to an SDL surface
 func RenderText(text string, color sdl.Color, font *ttf.Font) (*sdl.Surface, error) {
+	if len(text) == 0 {
+		return nil, fmt.Errorf("text is empty")
+	}
 	textSurface, err := font.RenderUTF8Blended(text, color)
 	if err != nil {
 		return nil, fmt.Errorf("error rendering text: %w", err)
@@ -122,11 +125,45 @@ func DrawTexture(renderer *sdl.Renderer, texture *sdl.Texture, rect sdl.Rect) {
 }
 
 // WrapText splits a long text into multiple lines based on the specified maximum width.
+func WrapTextFont(text string, font *ttf.Font, maxWidth int) []string {
+	var wrappedLines []string
+	words := strings.Split(text, " ")
+	if len(words) == 0 {
+		return []string{text}
+	}
+
+	var currentLine string
+	for _, word := range words {
+		// Measure the width of the current line with the new word
+		lineWithWord := currentLine + " " + word
+		width := TextWidth(font, lineWithWord)
+		if width > maxWidth {
+			// If the line exceeds the max width, add the current line to wrappedLines
+			// and start a new line with the current word
+			if currentLine != "" {
+				wrappedLines = append(wrappedLines, strings.TrimSpace(currentLine))
+			}
+			currentLine = word
+		} else {
+			// Otherwise, add the word to the current line
+			currentLine = lineWithWord
+		}
+	}
+
+	// Add the last line to wrappedLines
+	if currentLine != "" {
+		wrappedLines = append(wrappedLines, strings.TrimSpace(currentLine))
+	}
+
+	return wrappedLines
+}
+
+// WrapText splits a long text into multiple lines based on the specified maximum width.
 func WrapText(text string, charWidth int, maxWidth int) []string {
 	var wrappedLines []string
 	words := strings.Split(text, " ")
 	if len(words) == 0 {
-		return wrappedLines
+		return []string{text}
 	}
 
 	var currentLine string
@@ -157,24 +194,20 @@ func WrapText(text string, charWidth int, maxWidth int) []string {
 
 // TextWidth calculates the width of a string of text based on the provided font.
 func TextWidth(font *ttf.Font, text string) int {
-	surface, err := font.RenderUTF8Blended(text, sdl.Color{R: 255, G: 255, B: 255, A: 255})
+	w, _, err := font.SizeUTF8(text)
 	if err != nil {
 		return 0
 	}
-	defer surface.Free()
-
-	return int(surface.W)
+	return int(w)
 }
 
 // TextHeight calculates the width of a string of text based on the provided font.
 func TextHeight(font *ttf.Font, text string) int {
-	surface, err := font.RenderUTF8Blended(text, sdl.Color{R: 255, G: 255, B: 255, A: 255})
+	_, h, err := font.SizeUTF8(text)
 	if err != nil {
 		return 0
 	}
-	defer surface.Free()
-
-	return int(surface.H)
+	return int(h)
 }
 
 func readJsonFileProperty(filepath string, property string) (string, error) {
