@@ -239,6 +239,9 @@ func (h *MainScreen) InDialog() bool {
 }
 
 func (h *MainScreen) ChangeSelection(item *menuItem, direction string) {
+	if item.Disabled {
+		return
+	}
 	switch item.Type {
 	case "select":
 		if direction == "RIGHT" {
