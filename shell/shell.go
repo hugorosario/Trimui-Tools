@@ -28,6 +28,12 @@ func RunCommandAsync(cmd string, event func(event ShellEvent)) (stdinChannel cha
 			return
 		}
 
+		stderr, err := command.StderrPipe()
+		if err != nil {
+			outputChannel <- ShellEvent{Type: "error", Data: err.Error()}
+			return
+		}
+
 		stdinPipe, err := command.StdinPipe()
 		if err != nil {
 			outputChannel <- ShellEvent{Type: "error", Data: err.Error()}
@@ -59,6 +65,16 @@ func RunCommandAsync(cmd string, event func(event ShellEvent)) (stdinChannel cha
 			outputChannel <- ShellEvent{Type: "error", Data: err.Error()}
 		}
 
+		errscanner := bufio.NewScanner(stderr)
+		for errscanner.Scan() {
+			data := errscanner.Text()
+			outputChannel <- ShellEvent{Type: "error", Data: data}
+		}
+
+		if err := errscanner.Err(); err != nil {
+			outputChannel <- ShellEvent{Type: "error", Data: err.Error()}
+		}
+
 		if err := command.Wait(); err != nil {
 			if exitError, ok := err.(*exec.ExitError); ok {
 				exitCode := exitError.ExitCode()
@@ -84,7 +100,7 @@ func RunCommandAsync(cmd string, event func(event ShellEvent)) (stdinChannel cha
 
 func RunCommandSync(cmd string) (output string, err error) {
 	command := exec.Command("sh", "-c", cmd)
-	stdout, err := command.Output()
+	stdout, err := command.CombinedOutput()
 	if err != nil {
 		return "", err
 	}

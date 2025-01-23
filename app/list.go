@@ -1,4 +1,4 @@
-package gui
+package app
 
 import (
 	"github.com/veandco/go-sdl2/sdl"

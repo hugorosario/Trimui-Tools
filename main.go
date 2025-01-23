@@ -6,12 +6,12 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/hugorosario/trimuitools/gui"
+	"github.com/hugorosario/trimuitools/app"
 )
 
 func main() {
 	defer func() {
-		gui.FreeGUI()
+		app.FreeGUI()
 		if r := recover(); r != nil {
 			log.Printf("Unhandled error: %v\n", r)
 			log.Println("Stack trace:")
@@ -19,9 +19,9 @@ func main() {
 			os.Exit(-1)
 		}
 	}()
-	if err := gui.InitGUI(); err != nil {
+
+	if err := app.InitGUI(); err != nil {
 		panic(err)
 	}
-
-	gui.Show()
+	app.Show()
 }

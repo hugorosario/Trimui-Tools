@@ -1,4 +1,4 @@
-package gui
+package app
 
 import (
 	"strings"

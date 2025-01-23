@@ -1,9 +1,10 @@
-package gui
+package app
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/veandco/go-sdl2/img"
@@ -124,7 +125,7 @@ func DrawTexture(renderer *sdl.Renderer, texture *sdl.Texture, rect sdl.Rect) {
 	_ = renderer.Copy(texture, nil, &rect)
 }
 
-// WrapText splits a long text into multiple lines based on the specified maximum width.
+// WrapText splits a long text into multiple lines based on the size of the font
 func WrapTextFont(text string, font *ttf.Font, maxWidth int) []string {
 	var wrappedLines []string
 	words := strings.Split(text, " ")
@@ -273,4 +274,42 @@ func clamp(value, min, max int) int {
 		return max
 	}
 	return value
+}
+
+// Extract all tags that are delimited by {{ and }}
+func getTags(s string) []string {
+	tags := make([]string, 0)
+	for _, tag := range strings.Split(s, "{{") {
+		if strings.Contains(tag, "}}") {
+			tags = append(tags, strings.Split(tag, "}}")[0])
+		}
+	}
+	return tags
+}
+
+// Example paths that can be handled by this function:
+// "0" - Refers to the first item in the root menu.
+// "1.2" - Refers to the third item in the second submenu.
+// "0.1.3" - Refers to the fourth item in the second submenu of the first item.
+func findItem(items []*menuItem, path string) *menuItem {
+	indices := strings.Split(path, ".")
+	if len(indices) == 0 {
+		return nil
+	}
+
+	index, err := strconv.Atoi(indices[0])
+	if err != nil {
+		return nil
+	}
+
+	if index < 0 || index >= len(items) {
+		return nil
+	}
+
+	item := items[index]
+	if len(indices) == 1 {
+		return item
+	}
+
+	return findItem(item.MenuItems, strings.Join(indices[1:], "."))
 }
